@@ -33,45 +33,54 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
+  try {
+    // Debug: Log login attempt
+    console.log('Login attempt for:', username);
+    
+    // 1. Find user
+    const [users] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+    console.log('Found user:', users[0]);
+
+    // 2. Verify user exists
+    if (!users.length) {
+      console.log('User not found');
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    try {
-        const [rows] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
+    const user = users[0];
 
-        if (rows.length === 0) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
+    // 3. Verify password
+    const match = await bcrypt.compare(password, user.password);
+    console.log('Password match:', match);
 
-        const user = rows[0];
-        const match = await bcrypt.compare(password, user.password);
-
-        if (!match) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role }, 
-            process.env.JWT_SECRET, 
-            { expiresIn: '1h' }
-        );
-
-        res.json({ 
-            message: 'Login successful', 
-            token,
-            user: {
-                id: user.id,
-                username: user.username,
-                role: user.role
-            }
-        });
-    } catch (err) {
-        console.error('Login error:', err);
-        res.status(500).json({ message: 'Server error during login' });
+    if (!match) {
+      console.log('Password mismatch');
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
+
+    // 4. Create JWT token
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // 5. Send response
+    res.json({ 
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role
+      }
+    });
+
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 module.exports = router;

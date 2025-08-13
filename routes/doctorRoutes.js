@@ -4,7 +4,7 @@ const { authenticateToken, authorizeRoles } = require('../middlewares/authMiddle
 const doctorController = require('../controllers/doctorcontroller');
 
 // Patient management
-router.get('/patients', authenticateToken, authorizeRoles('doctor'), doctorController.getActivePatients);
+router.get('/patients', authenticateToken, authorizeRoles('doctor', 'receptionist'), doctorController.getActivePatients);
 
 // Patient history
 router.get('/patients/history', authenticateToken, authorizeRoles('doctor'), doctorController.getPatientHistory);

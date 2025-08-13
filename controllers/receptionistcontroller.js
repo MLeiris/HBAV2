@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { search } = require('../routes/auth');
 
 module.exports = {
   registerPatient: async (req, res) => {
@@ -66,6 +67,45 @@ module.exports = {
     } catch (err) {
       await db.query('ROLLBACK');
       res.status(500).json({ error: 'Discharge failed' });
+    }
+  },
+
+  searchPatients: async (req, res) => {
+    try {
+      const { name } = req.query;
+
+      const [patients] = await db.query(
+        `SELECT 
+          p.id, 
+          p.name, 
+          p.age, 
+          p.gender, 
+          p.admission_date,
+          p.discharged,
+          p.medical_condition,
+          w.name AS ward,
+          b.id AS bed,
+          b.status AS bed_status
+        FROM patients p
+        LEFT JOIN beds b ON p.bed_id = b.id
+        LEFT JOIN wards w ON b.ward_id = w.id
+        WHERE p.name LIKE ? 
+        LIMIT 50`,
+        [`%${name}%`]
+      );
+
+      res.json({
+        success: true,
+        count: patients.length,
+        data: patients
+      });
+    } catch (err) {
+      console.error('Simple search error:', err);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Search failed',
+        details: err.message 
+      });
     }
   }
 };

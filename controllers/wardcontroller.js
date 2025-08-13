@@ -19,5 +19,15 @@ module.exports = {
     } catch (err) {
       res.status(500).json({ error: 'Database error' });
     }
+  },
+  getAllWards: async (req, res) => {
+    try {
+      const [results] = await db.query(`
+        SELECT * FROM wards
+      `);
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ error: 'Database error' });
+    }
   }
 };
