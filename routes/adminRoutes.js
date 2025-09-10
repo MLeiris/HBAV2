@@ -8,5 +8,6 @@ router.post('/wards', authenticateToken, authorizeRoles('admin'), adminControlle
 
 // User management
 router.get('/users', authenticateToken, authorizeRoles('admin'), adminController.getAllUsers);
+router.delete('/users/:id', authenticateToken, authorizeRoles('admin'), adminController.deleteUser);
 
 module.exports = router;

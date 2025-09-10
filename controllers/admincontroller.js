@@ -37,5 +37,18 @@ module.exports = {
     } catch (err) {
       res.status(500).json({ error: 'Database error' });
     }
+  },
+
+  deleteUser: async (req, res) => {
+    const userId = req.params.id;
+    try {
+      const [result] = await db.query('DELETE FROM users WHERE id = ?', [userId]);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json({ success: true, message: 'User deleted successfully' });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to delete user' });
+    }
   }
 };
