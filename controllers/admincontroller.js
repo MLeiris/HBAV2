@@ -1,12 +1,15 @@
 const db = require('../config/db');
-const wardService = require('../services/wardService');
-const bedService = require('../services/bedService');
+const { logActivity } = require('../services/activityLogService'); 
 
 module.exports = {
   createWard: async (req, res) => {
+  
+    const userId = req.user ? req.user.id : 1; 
     const { name, capacity } = req.body;
     
+   
     try {
+      await db.query('START TRANSACTION');
       const [wardResult] = await db.query(
         'INSERT INTO wards (name, capacity) VALUES (?, ?)',
         [name, capacity]
@@ -24,31 +27,79 @@ module.exports = {
       }
       await Promise.all(bedPromises);
 
-      res.status(201).json({ wardId });
+  
+      await logActivity(
+        userId, 
+        `Created new ward: ${name} (Capacity: ${capacity})`, 
+        'Ward Management'
+      );
+
+      res.status(201).json({ success: true, wardId });
     } catch (err) {
-      res.status(500).json({ error: 'Failed to create ward and beds' });
+
+      console.error(err);
+      res.status(500).json({ success: false, error: 'Failed to create ward and beds' });
+    }
+
+  },
+
+  deleteUser: async (req, res) => {
+    const userId = req.params.id;
+
+    const adminId = req.user ? req.user.id : 1; 
+
+    try {
+
+      const [users] = await db.query('SELECT username FROM users WHERE id = ?', [userId]);
+      const usernameToDelete = users.length > 0 ? users[0].username : `ID: ${userId}`;
+      
+      const [result] = await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      await logActivity(
+        adminId, 
+        `Deleted user: ${usernameToDelete}`, 
+        'User Management'
+      );
+      
+      res.json({ success: true, message: 'User deleted successfully' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, error: 'Failed to delete user' });
+    }
+  },
+
+  getActivityLogs: async (req, res) => {
+    try {
+      const [logs] = await db.query(`
+        SELECT 
+          a.id,
+          u.username AS user,
+          a.action,
+          a.location,
+          a.timestamp
+        FROM activity_logs a
+        JOIN users u ON a.user_id = u.id
+        ORDER BY a.timestamp DESC
+        LIMIT 50
+      `);
+      res.json({ success: true, data: logs });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, error: 'Failed to fetch activity logs' });
     }
   },
 
   getAllUsers: async (req, res) => {
     try {
       const [users] = await db.query('SELECT id, username, role FROM users');
-      res.json(users);
+      res.json({ success: true, data: users });
     } catch (err) {
-      res.status(500).json({ error: 'Database error' });
-    }
-  },
-
-  deleteUser: async (req, res) => {
-    const userId = req.params.id;
-    try {
-      const [result] = await db.query('DELETE FROM users WHERE id = ?', [userId]);
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json({ success: true, message: 'User deleted successfully' });
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to delete user' });
+      console.error(err);
+      res.status(500).json({ success: false, error: 'Database error' });
     }
   }
 };
