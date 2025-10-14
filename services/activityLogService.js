@@ -1,4 +1,4 @@
-// services/activityLogService.js
+
 const db = require('../config/db');
 
 const logActivity = async (userId, action, location) => {
