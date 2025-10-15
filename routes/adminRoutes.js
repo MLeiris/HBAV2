@@ -10,6 +10,6 @@ router.post('/wards', authenticateToken, authorizeRoles('admin'), adminControlle
 router.get('/users', authenticateToken, authorizeRoles('admin'), adminController.getAllUsers);
 router.delete('/users/:id', authenticateToken, authorizeRoles('admin'), adminController.deleteUser);
 
-router.get('/activityLogs', authenticateToken, authorizeRoles('admin'), adminController.getActivityLogs);
+router.get('/activityLogs/users/:id', authenticateToken, authorizeRoles('admin'), adminController.getActivityLogs);
 
 module.exports = router;

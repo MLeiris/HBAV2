@@ -3,11 +3,9 @@ const { logActivity } = require('../services/activityLogService');
 
 module.exports = {
   createWard: async (req, res) => {
-  
     const userId = req.user ? req.user.id : 1; 
     const { name, capacity } = req.body;
-    
-   
+
     try {
       await db.query('START TRANSACTION');
       const [wardResult] = await db.query(
@@ -27,7 +25,6 @@ module.exports = {
       }
       await Promise.all(bedPromises);
 
-  
       await logActivity(
         userId, 
         `Created new ward: ${name} (Capacity: ${capacity})`, 
@@ -36,20 +33,16 @@ module.exports = {
 
       res.status(201).json({ success: true, wardId });
     } catch (err) {
-
       console.error(err);
       res.status(500).json({ success: false, error: 'Failed to create ward and beds' });
     }
-
   },
 
   deleteUser: async (req, res) => {
     const userId = req.params.id;
-
     const adminId = req.user ? req.user.id : 1; 
 
     try {
-
       const [users] = await db.query('SELECT username FROM users WHERE id = ?', [userId]);
       const usernameToDelete = users.length > 0 ? users[0].username : `ID: ${userId}`;
       
@@ -72,7 +65,9 @@ module.exports = {
     }
   },
 
+  // Updated: Get activity logs for a specific user by ID
   getActivityLogs: async (req, res) => {
+    const userId = req.params.id;
     try {
       const [logs] = await db.query(`
         SELECT 
@@ -83,9 +78,10 @@ module.exports = {
           a.timestamp
         FROM activity_logs a
         JOIN users u ON a.user_id = u.id
+        WHERE a.user_id = ?
         ORDER BY a.timestamp DESC
         LIMIT 50
-      `);
+      `, [userId]);
       res.json({ success: true, data: logs });
     } catch (err) {
       console.error(err);

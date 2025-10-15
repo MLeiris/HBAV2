@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { logActivity } = require('../services/activityLogService');
 
 router.post('/register', async (req, res) => {
     const { username, password, role } = req.body;
@@ -22,6 +23,9 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const [result] = await db.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hashedPassword, role]);
         
+        // Log registration activity
+        await logActivity(result.insertId, 'Registered', 'Authentication');
+
         res.status(201).json({ 
             message: 'User registered successfully',
             userId: result.insertId 
@@ -36,16 +40,11 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Debug: Log login attempt
-    console.log('Login attempt for:', username);
-    
     // 1. Find user
     const [users] = await db.query('SELECT * FROM users WHERE username = ?', [username]);
-    console.log('Found user:', users[0]);
 
     // 2. Verify user exists
     if (!users.length) {
-      console.log('User not found');
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
@@ -53,21 +52,22 @@ router.post('/login', async (req, res) => {
 
     // 3. Verify password
     const match = await bcrypt.compare(password, user.password);
-    console.log('Password match:', match);
 
     if (!match) {
-      console.log('Password mismatch');
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // 4. Create JWT token
+    // 4. Log login activity
+    await logActivity(user.id, 'Logged in', 'Authentication');
+
+    // 5. Create JWT token
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // 5. Send response
+    // 6. Send response
     res.json({ 
       token,
       user: {
