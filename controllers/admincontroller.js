@@ -66,8 +66,11 @@ module.exports = {
   },
 
   // Updated: Get activity logs for a specific user by ID
-  getActivityLogs: async (req, res) => {
+ // In your admincontroller.js
+getActivityLogs: async (req, res) => {
     const userId = req.params.id;
+    console.log('Backend: Fetching logs for user ID:', userId);
+    
     try {
       const [logs] = await db.query(`
         SELECT 
@@ -82,9 +85,11 @@ module.exports = {
         ORDER BY a.timestamp DESC
         LIMIT 50
       `, [userId]);
+      
+      console.log('Backend: Found', logs.length, 'logs');
       res.json({ success: true, data: logs });
     } catch (err) {
-      console.error(err);
+      console.error('Backend Error:', err);
       res.status(500).json({ success: false, error: 'Failed to fetch activity logs' });
     }
   },
