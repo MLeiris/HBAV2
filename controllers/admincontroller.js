@@ -5,36 +5,59 @@ module.exports = {
   createWard: async (req, res) => {
     const userId = req.user ? req.user.id : 1; 
     const { name, capacity } = req.body;
+    let connection; // Declare variable to hold the transaction connection
+
+    // Basic input validation
+    if (!name || !capacity || typeof capacity !== 'number' || capacity < 1) {
+        return res.status(400).json({ success: false, error: 'Ward name and a valid capacity (1 or more) are required.' });
+    }
 
     try {
-      await db.query('START TRANSACTION');
-      const [wardResult] = await db.query(
-        'INSERT INTO wards (name, capacity) VALUES (?, ?)',
-        [name, capacity]
-      );
-      const wardId = wardResult.insertId;
+        // 1. GET DEDICATED CONNECTION and START TRANSACTION
+        connection = await db.getConnection(); 
+        await connection.beginTransaction(); 
 
-      const bedPromises = [];
-      for (let i = 1; i <= capacity; i++) {
-        bedPromises.push(
-          db.query(
-            'INSERT INTO beds (ward_id, bed_number, status) VALUES (?, ?, ?)',
-            [wardId, `${name}-${i}`, 'available']
-          )
+        // 2. INSERT WARD
+        const [wardResult] = await connection.query(
+            'INSERT INTO wards (name, capacity) VALUES (?, ?)',
+            [name, capacity]
         );
-      }
-      await Promise.all(bedPromises);
+        const wardId = wardResult.insertId;
 
-      await logActivity(
-        userId, 
-        `Created new ward: ${name} (Capacity: ${capacity})`, 
-        'Ward Management'
-      );
+        // 3. INSERT BEDS
+        const bedPromises = [];
+        for (let i = 1; i <= capacity; i++) {
+            bedPromises.push(
+                connection.query(
+                    'INSERT INTO beds (ward_id, bed_number, status) VALUES (?, ?, ?)',
+                    [wardId, `${name}-${i}`, 'available']
+                )
+            );
+        }
+        await Promise.all(bedPromises);
 
-      res.status(201).json({ success: true, wardId });
+        // 4. LOG ACTIVITY
+        await logActivity(
+            userId, 
+            `Created new ward: ${name} (Capacity: ${capacity})`, 
+            'Ward Management'
+        );
+        
+        // 5. COMMIT TRANSACTION and RELEASE connection
+        await connection.commit(); 
+        connection.release();
+
+        res.status(201).json({ success: true, wardId, message: 'Ward and beds created successfully' });
+        
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ success: false, error: 'Failed to create ward and beds' });
+        // 6. ROLLBACK AND RELEASE CONNECTION on failure
+        if (connection) {
+            await connection.rollback();
+            connection.release(); 
+        }
+        
+        console.error(err);
+        res.status(500).json({ success: false, error: 'Failed to create ward and beds' });
     }
   },
 
@@ -65,11 +88,8 @@ module.exports = {
     }
   },
 
-  // Updated: Get activity logs for a specific user by ID
- // In your admincontroller.js
-getActivityLogs: async (req, res) => {
+  getActivityLogs: async (req, res) => {
     const userId = req.params.id;
-    console.log('Backend: Fetching logs for user ID:', userId);
     
     try {
       const [logs] = await db.query(`
@@ -86,10 +106,9 @@ getActivityLogs: async (req, res) => {
         LIMIT 50
       `, [userId]);
       
-      console.log('Backend: Found', logs.length, 'logs');
       res.json({ success: true, data: logs });
     } catch (err) {
-      console.error('Backend Error:', err);
+      console.error(err);
       res.status(500).json({ success: false, error: 'Failed to fetch activity logs' });
     }
   },
